@@ -1,0 +1,143 @@
+<!-- Blue Map — everything blue
+Single-file HTML map using Leaflet. "Everything blue": tiles are tinted with CSS filters
+and a translucent blue overlay that gives rivers, oceans, and moods the proper hue.
+Save as `blue-map.html` and open in a browser.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blue Map — Everything Blue</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-sA+e2k6F6gq3h6Wm2bqP3Kk3wQ1Qf5u8qk1q2h2mZ6M=" crossorigin=""/>
+  <style>
+    :root{
+      --blue-0: #e6f2ff;
+      --blue-1: #cfe9ff;
+      --blue-2: #93c5fd;
+      --blue-3: #3b82f6;
+      --blue-4: #1e3a8a;
+    }
+    html,body,#map{height:100%;margin:0;padding:0}
+    body{
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      background: linear-gradient(180deg,var(--blue-0), #dff3ff);
+      color: var(--blue-4);
+      -webkit-font-smoothing:antialiased;
+    }
+    /* Container for the map */
+    #map{position:relative}
+
+    /* Tint the raster tiles: convert to cool blue tones */
+    .leaflet-tile {
+      filter: grayscale(100%) brightness(1.05) sepia(30%) hue-rotate(190deg) saturate(180%);
+      transition: filter .25s ease;
+    }
+
+    /* A translucent, multiplicative blue veil over the map to guarantee "everything blue" */
+    .blue-veil{
+      position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;
+      background: linear-gradient(180deg, rgba(24,58,130,0.25), rgba(3,105,161,0.18));
+      backdrop-filter: contrast(0.95) brightness(1.02);
+    }
+
+    /* Style controls and attribution to match the blue theme */
+    .leaflet-control, .leaflet-control *{font-family:inherit}
+    .leaflet-bar a, .leaflet-bar a:hover{background:transparent;border:1px solid rgba(255,255,255,0.12);color:var(--blue-3)}
+    .leaflet-control-layers-toggle{filter:grayscale(100%) hue-rotate(200deg) saturate(150%)}
+    .leaflet-control-attribution{background:linear-gradient(90deg, rgba(255,255,255,0.0), rgba(255,255,255,0.05));color:var(--blue-4)}
+
+    /* Blue-themed marker (pulsing) */
+    .pulse {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: -9px;
+      top: -9px;
+      border-radius: 50%;
+      background: rgba(59,130,246,1);
+      box-shadow: 0 0 0 6px rgba(41, 95, 180, 0.15), 0 0 18px rgba(59,130,246,0.08);
+      animation: pulse 2s infinite;
+      border: 2px solid rgba(17, 12, 12, 0.6);
+    }
+    @keyframes pulse{0%{transform:scale(.8);opacity:1}70%{transform:scale(2.4);opacity:0}100%{opacity:0}}
+
+    /* Simple header */
+    .top-ui{
+      position:absolute;left:12px;top:12px;z-index:6500;background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));border-radius:10px;padding:8px 12px;border:1px solid rgba(255,255,255,0.06);
+      color:var(--blue-4);backdrop-filter: blur(6px);
+    }
+    .top-ui h1{font-size:16px;margin:0 0 4px 0}
+    .top-ui p{font-size:12px;margin:0;opacity:.9}
+
+    /* Footer legend */
+    .legend{position:absolute;right:12px;bottom:12px;background:rgba(255,255,255,0.03);padding:10px;border-radius:8px;color:var(--blue-2);font-size:13px;border:1px solid rgba(255,255,255,0.04)}
+    .btn{display:inline-block;padding:6px 10px;border-radius:8px;background:linear-gradient(180deg,var(--blue-3),var(--blue-4));color:white;border:none;cursor:pointer;font-weight:600}
+
+    /* Make popups blue */
+    .leaflet-popup-content-wrapper{background:linear-gradient(180deg,rgba(255,255,255,0.98),rgba(230,245,255,0.95));color:var(--blue-4)}
+    .leaflet-popup-tip{background:linear-gradient(180deg,rgba(230,245,255,0.95),rgba(255,255,255,0.98))}
+
+    /* Mobile tweaks */
+    @media (max-width:600px){.top-ui{left:8px;right:8px;padding:8px}}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="blue-veil"></div>
+  <div class="top-ui">
+    <h1>Blue Map</h1>
+    <p>Everything blue. Rivers, oceans, moods.</p>
+  </div>
+  <div class="legend">Zoom & pan — everything is in blue. <button class="btn" id="centerBtn">Center me</button></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o9N1j8kG+q3w1q8z+7n1n3wQ3Q1Qf5u8qk1q2h2mZ6M=" crossorigin=""></script>
+  <script>
+    // Initialize map
+    const map = L.map('map', {zoomControl: true}).setView([0, 0], 2);
+
+    // OpenStreetMap raster tiles (tinted by CSS + overlay veil)
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Add a pulsing marker at the user's approximate location (if available)
+    function addPulse(latlng, label){
+      const icon = L.divIcon({className: '', html: '<span class="pulse"></span>', iconSize: [18,18]});
+      const marker = L.marker(latlng, {icon}).addTo(map);
+      marker.bindPopup('<b>'+label+'</b><br/>This place is feeling particularly blue.').openPopup();
+      return marker;
+    }
+
+    // Try geolocation; fallback to a decorative place
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        const ll=[pos.coords.latitude,pos.coords.longitude];
+        map.setView(ll, 10);
+        addPulse(ll, 'You are here');
+      }, err=>{
+        addPulse([51.5074,-0.1278], 'London — charming and blue');
+      }, {timeout:7000});
+    } else {
+      addPulse([40.7128,-74.0060], 'New York — moody blue');
+    }
+
+    // Center button
+    document.getElementById('centerBtn').addEventListener('click', ()=>{
+      map.flyTo([0,0],2,{duration:1.2});
+    });
+
+    // Add a soft blue circle over large water-like areas when zoomed out as an optional effect
+    const waterTint = L.circle([20,-20], {radius: 2000000, color: '#1e40af', weight:0, fillColor:'#1e40af', fillOpacity:0.02}).addTo(map);
+
+    // A tiny interactive example: draw a blue line (river) with blue style
+    const riverCoords = [[48.85,2.35],[48.5,2.6],[48.2,2.1]]; // playful placeholder
+    const river = L.polyline(riverCoords, {color:'#60a5fa', weight:4, opacity:0.9}).addTo(map);
+    river.bindPopup('A very blue river (placeholder)').on('mouseover', e=>e.target.openPopup()).on('mouseout', e=>e.target.closePopup());
+
+    // Help users know how to change the tile tint via CSS (dev-friendly)
+    console.log('Blue Map ready — to tinker with the intensity of the blue look, open the CSS and change the .leaflet-tile filter or the .blue-veil opacity.');
+  </script>
+</body>
+</html>
